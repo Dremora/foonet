@@ -3,12 +3,21 @@ mysql = require './mysql'
 client_connection = require './client_connection'
 server_connection = require './server_connection'
 
-exports.createServer = (port, mysql_options) ->
+exports.createServer = (port, mysql_options, callback) ->
   mysql.createConnection mysql_options, (error) ->
-    net.createServer (c) ->
+    return callback(error) if error
+    server = net.createServer (c) ->
       new client_connection.ClientConnection c
-    .listen port, ->
+
+    # Error handling - currently address in use only
+    server.on 'error', (error) ->
+      if error.code == 'EADDRINUSE'
+        callback(error)
+
+    # Begin listening
+    server.listen port, ->
       console.log "Server running at localhost:#{port}"
+      callback()
 
 exports.createConnection = (port, host, callback) ->
   socket = new net.Socket
