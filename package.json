@@ -1,4 +1,7 @@
 {
   "name": "foonet",
-  "main": "./lib"
+  "main": "./lib",
+  "dependencies": {
+  	"mysql": ">= 0.9.1"
+  }
 }
