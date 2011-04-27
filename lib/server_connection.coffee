@@ -1,6 +1,6 @@
-Address = require('./address').Address
+Address = require('./address')
 
-class exports.ServerConnection
+module.exports = class ServerConnection
   constructor: (@socket) ->
     @socket.setEncoding 'utf8'
     @buffer = []

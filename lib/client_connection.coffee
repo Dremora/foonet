@@ -1,7 +1,7 @@
 # Hash with authenticated clients
 clients = {}
 
-class exports.ClientConnection
+module.exports = class ClientConnection
   constructor: (@socket) ->
     @socket.setEncoding 'utf8'
     @buffer = []

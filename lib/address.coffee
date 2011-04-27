@@ -1,4 +1,4 @@
-exports.Address = class Address
+module.exports = class Address
   constructor: (address) ->
     unless matches = /^([0-9a-f]{2})\:([0-9a-f]{2})\:([0-9a-f]{2})\:([0-9a-f]{2})$/.exec address
       throw new Error 'Error parsing address'
