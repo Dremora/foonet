@@ -1,4 +1,4 @@
-foonet = require '../lib/foonet'
+foonet = require '..'
 
 foonet.createConnection 8000, 'localhost', (connection) ->
   process.stdout.write 'Enter address: '

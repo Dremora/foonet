@@ -1,3 +1,3 @@
-foonet = require '../lib/foonet'
+foonet = require '..'
 
 foonet.createServer 8000
