@@ -16,7 +16,7 @@ module.exports = class ServerConnection
 
   actions:
     parse_address: [
-      /^ADDRESS (.{[0-9a-f]})$/
+      /^ADDRESS ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2})$/
       (address) ->
         @address = new Address address
         console.log "Received address #{address}"
