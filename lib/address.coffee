@@ -23,5 +23,5 @@ module.exports = class Address
 
   toNumber: ->
     results = 0
-    results += @buffer[i] << i * 8 for i in [0...@buffer.length]
+    results += @buffer[i] << 8 * (3 - i) for i in [0...@buffer.length]
     results
