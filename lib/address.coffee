@@ -1,15 +1,20 @@
 module.exports = class Address
   constructor: (address) ->
-    unless matches = /^([0-9a-f]{2})\:([0-9a-f]{2})\:([0-9a-f]{2})\:([0-9a-f]{2})$/.exec address
-      throw new Error 'Error parsing address'
-    matches.splice(0, 1)
-    @buffer = new Buffer(4)
-    for i in [0...matches.length]
-      @buffer[i] = 0
-      for j in [0, 1]
-        c = matches[i].charCodeAt(j)
-        @buffer[i] |= (c - (if c > 57 then 87 else 48)) << (1 - j) * 4
-    console.log @buffer
+    switch typeof address
+      when 'string'
+        unless matches = /^([0-9a-f]{2})\:([0-9a-f]{2})\:([0-9a-f]{2})\:([0-9a-f]{2})$/.exec address
+          throw new Error 'Error parsing address'
+        matches.splice(0, 1)
+        @buffer = new Buffer(4)
+        for i in [0...matches.length]
+          @buffer[i] = 0
+          for j in [0, 1]
+            c = matches[i].charCodeAt(j)
+            @buffer[i] |= (c - (if c > 57 then 87 else 48)) << (1 - j) * 4
+      when 'number'
+        @buffer = new Buffer(4)
+        for i in [0...@buffer.length]
+          @buffer[i] = address >> (8 * (3 - i)) & 0xFF
 
   toString: ->
     r = []
