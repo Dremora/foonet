@@ -1,3 +1,5 @@
+Address = require './address'
+
 # Hash with authenticated clients
 clients = {}
 
@@ -11,25 +13,33 @@ module.exports = class ClientConnection
 
   states:
     not_authenticated: 'not_authenticated'
+    received_address: 'received_address'
     authenticated: 'authenticated'
 
   actions:
     parse_address: [
       /^ADDRESS ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2})$/
       (address) ->
-        @address = address
-        clients[address] = @
-        console.log "Client #{address} identified"
-        @set_state @states.authenticated
-        @socket.on 'close', ->
-          delete clients[@address]
-          console.log "Client #{address} quit"
+        @set_state @states.received_address
+        address = new Address(address)
+        if clients[address]
+          @socket.write "NOT AUTHENTICATED\n"
+          @set_state @states.not_authenticated
+        else address.find (exists) =>
+          if exists
+            @set_address(address)
+            @socket.write "AUTHENTICATED\n"
+          else
+            @socket.write "NOT AUTHENTICATED\n"
+            @set_state @states.not_authenticated
     ]
 
     request_address: [
       /^REQUEST$/
       ->
-        # TODO
+        Address.create (address) =>
+          @set_address(address)
+          @socket.write "ADDRESS #{address}\n"
     ]
 
     connect: [
@@ -46,6 +56,7 @@ module.exports = class ClientConnection
     authenticated: [
       `ClientConnection.prototype.actions.connect`
     ]
+    received_address: []
 
   set_state: (state) ->
     @state = state
@@ -62,4 +73,13 @@ module.exports = class ClientConnection
           action[1].apply @, matches
           return
 
-      @socket.write "Unknown command\n"
+      @socket.end("Unknown command - #{command}\n")
+
+  set_address: (address) ->
+    @address = address
+    clients[@address] = @
+    console.log "Client #{address} identified"
+    @socket.on 'close', ->
+      delete clients[@address]
+      console.log "Client #{address} quit"
+    @set_state @states.authenticated

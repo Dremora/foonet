@@ -57,14 +57,20 @@ module.exports = class ServerConnection
       command = matches[1]
       @buffer.splice 0, matches[0].length
 
-      for action in @prototype.actions[@transitions[@state]]
+      for action in @transitions[@state]
+        action = @actions[action]
         if matches = action[0].exec command
           matches.splice(0, 1)
           action[1].apply @, matches
           return
 
-      @socket.write "Unknown command\n"
+      @socket.end("Unknown command - #{command}\n")
 
   set_address: (address) ->
     @address = new Address address
     @socket.write "ADDRESS #{address}\n"
+    @set_state @states.address_sent
+
+  request_address: ->
+    @socket.write "REQUEST\n"
+    @set_state @states.address_requested

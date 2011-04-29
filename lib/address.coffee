@@ -1,3 +1,5 @@
+mysql = require './mysql'
+
 module.exports = class Address
   constructor: (address) ->
     switch typeof address
@@ -30,3 +32,14 @@ module.exports = class Address
     results = 0
     results += @buffer[i] << 8 * (3 - i) for i in [0...@buffer.length]
     results
+
+  find: (callback) ->
+    mysql.connection.query 'SELECT * FROM addresses WHERE address = ?',
+    [@toNumber()], (error, results) ->
+      throw error if error
+      callback(results.length > 0)
+
+Address.create = (callback) ->
+  mysql.connection.query 'INSERT INTO addresses VALUES()', (error, results) ->
+    throw error if error
+    callback(new Address(results.insertId))
