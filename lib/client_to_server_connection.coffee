@@ -1,7 +1,7 @@
 Address = require('./address')
 CommandConnection = require './command_connection'
 
-module.exports = class ServerConnection extends CommandConnection
+module.exports = class ClientToServerConnection extends CommandConnection
   states:
     not_authenticated: 'not_authenticated'
     address_requested: 'address_requested'

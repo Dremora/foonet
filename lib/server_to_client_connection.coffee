@@ -4,7 +4,7 @@ CommandConnection = require './command_connection'
 # Hash with authenticated clients
 clients = {}
 
-module.exports = class ClientConnection extends CommandConnection
+module.exports = class ServerToClientConnection extends CommandConnection
   states:
     not_authenticated: 'not_authenticated'
     received_address: 'received_address'
