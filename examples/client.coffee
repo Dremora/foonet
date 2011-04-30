@@ -1,6 +1,6 @@
 foonet = require '..'
 
-foonet.createConnection 8000, 'localhost', (connection) ->
+new foonet.Client 8000, 'localhost', (connection) ->
   process.stdout.write 'Input address or press enter to get one: '
   process.stdin.resume()
 
