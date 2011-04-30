@@ -7,14 +7,14 @@ clients = {}
 module.exports = class ServerToClientConnection extends CommandConnection
   states:
     not_authenticated: 'not_authenticated'
-    received_address: 'received_address'
+    received_address_request: 'received_address_request'
     authenticated: 'authenticated'
 
   actions:
     parse_address: [
       /^ADDRESS ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2})$/
       (address) ->
-        @set_state @states.received_address
+        @set_state @states.received_address_request
         address = new Address(address)
         if clients[address]
           @socket.write "NOT AUTHENTICATED\n"
@@ -31,6 +31,7 @@ module.exports = class ServerToClientConnection extends CommandConnection
     request_address: [
       /^REQUEST$/
       ->
+        @set_state @states.received_address_request
         Address.create (address) =>
           @set_address(address)
           @socket.write "ADDRESS #{address}\n"
@@ -50,7 +51,7 @@ module.exports = class ServerToClientConnection extends CommandConnection
     authenticated: [
       'connect'
     ]
-    received_address: []
+    received_address_request: []
 
   set_address: (address) ->
     @address = address
