@@ -6,35 +6,35 @@ clients = {}
 
 module.exports = class ServerToClientConnection extends CommandConnection
   states:
-    not_authenticated: 'not_authenticated'
-    received_address_request: 'received_address_request'
+    notAuthenticated: 'notAuthenticated'
+    receivedAddressRequest: 'receivedAddressRequest'
     authenticated: 'authenticated'
-    received_capabilities: 'received_capabilities'
+    receivedCapabilities: 'receivedCapabilities'
 
   actions:
-    parse_address: [
+    parseAddress: [
       /^ADDRESS ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2})$/
       (address) ->
-        @set_state @states.received_address_request
+        @setState @states.receivedAddressRequest
         address = new Address(address)
         if clients[address]
           @socket.write "NOT AUTHENTICATED\n"
-          @set_state @states.not_authenticated
+          @setState @states.notAuthenticated
         else address.find (exists) =>
           if exists
-            @set_address(address)
+            @setAddress(address)
             @socket.write "AUTHENTICATED\n"
           else
             @socket.write "NOT AUTHENTICATED\n"
-            @set_state @states.not_authenticated
+            @setState @states.notAuthenticated
     ]
 
-    request_address: [
+    requestAddress: [
       /^REQUEST$/
       ->
-        @set_state @states.received_address_request
+        @setState @states.receivedAddressRequest
         Address.create (address) =>
-          @set_address(address)
+          @setAddress(address)
           @socket.write "ADDRESS #{address}\n"
     ]
 
@@ -44,7 +44,7 @@ module.exports = class ServerToClientConnection extends CommandConnection
       /^CAPABILITIES (TCP|UDP) ([0-9]{1,5})$/
       (@protocol, port) ->
         @port = parseInt(port) # TODO: check range
-        @set_state @states.received_capabilities
+        @setState @states.receivedCapabilities
     ]
 
     # Received when peer wants to connect to another peer.
@@ -70,23 +70,23 @@ module.exports = class ServerToClientConnection extends CommandConnection
     ]
 
   transitions:
-    not_authenticated: [
-      'request_address'
-      'parse_address'
+    notAuthenticated: [
+      'requestAddress'
+      'parseAddress'
     ]
-    received_address_request: []
+    receivedAddressRequest: []
     authenticated: [
       'capabilities'
     ]
-    received_capabilities: [
+    receivedCapabilities: [
       'connect'
       'waiting'
     ]
 
-  set_address: (@address) ->
+  setAddress: (@address) ->
     clients[@address] = @
     console.log "Client #{address} identified"
     @socket.on 'close', =>
       delete clients[@address]
       console.log "Client #{address} quit"
-    @set_state @states.authenticated
+    @setState @states.authenticated

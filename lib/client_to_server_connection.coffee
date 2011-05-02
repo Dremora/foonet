@@ -3,19 +3,19 @@ CommandConnection = require './command_connection'
 
 module.exports = class ClientToServerConnection extends CommandConnection
   states:
-    not_authenticated: 'not_authenticated'
-    address_requested: 'address_requested'
-    address_sent: 'address_sent'
+    notAuthenticated: 'notAuthenticated'
+    addressRequested: 'addressRequested'
+    addressSent: 'addressSent'
     authenticated: 'authenticated'
 
   actions:
-    parse_address: [
+    parseAddress: [
       /^ADDRESS ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2})$/
       (address) ->
         @address = new Address address
         console.log "Received address #{address}"
         @socket.write "CAPABILITIES TCP #{@client.port}\n"
-        @set_state @states.authenticated
+        @setState @states.authenticated
     ]
 
     authenticated: [
@@ -23,70 +23,70 @@ module.exports = class ClientToServerConnection extends CommandConnection
       ->
         console.log 'Authenticated'
         @socket.write "CAPABILITIES TCP #{@client.port}\n"
-        @set_state @states.authenticated
+        @setState @states.authenticated
     ]
 
-    not_authenticated: [
+    notAuthenticated: [
       /^NOT AUTHENTICATED$/
       ->
         console.log 'Not authenticated'
-        @set_state @states.not_authenticated
+        @setState @states.notAuthenticated
     ]
 
     # Received when a remote host with specified `address' wants to connect
     # to the local host or vice versa, when local host should wait for
     # an incoming connection from the remote host.
-    peer_in: [
+    peerIn: [
       /^PEER ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2}) IN (TCP|UDP) ((?:[0-9]{1,3}\.){3}[0-9]{1,3})$/
       (address, protocol, ip) ->
         key = Math.floor(Math.random() * 10000000000000000).toString()
         while key.length < 16
           key = '0' + key
-        @client.accept_from address, protocol, ip, key
+        @client.acceptFrom address, protocol, ip, key
         @socket.write "WAITING #{address} #{key}\n"
     ]
 
     # Received when a remote host with specified `address' wants to connect
     # to the local host or vice versa, when the remote host is ready
     # to accept connections.
-    peer_out: [
+    peerOut: [
       /^PEER ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2}) OUT (TCP|UDP) ((?:[0-9]{1,3}\.){3}[0-9]{1,3}) ([0-9]{1,5}) ([0-9]{16})$/
       (address, protocol, ip, port, key) ->
         port = parseInt(port) # TODO: check range
-        @client.connect_to address, protocol, ip, port, key
+        @client.connectTo address, protocol, ip, port, key
     ]
 
     # Received as a responce to a CONNECT or WAITING message when remote host
     # with specified address is not found.
-    peer_missing: [
+    peerMissing: [
       /^PEER ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2}) MISSING$/
       (address) ->
         @client.emit 'peerMissing', new Address(address)
     ]
 
   transitions:
-    not_authenticated: []
-    address_requested: [
-      'parse_address'
+    notAuthenticated: []
+    addressRequested: [
+      'parseAddress'
     ]
-    address_sent: [
+    addressSent: [
       'authenticated'
-      'not_authenticated'
+      'notAuthenticated'
     ]
     authenticated: [
-      'peer_in'
-      'peer_out'
-      'peer_missing'
+      'peerIn'
+      'peerOut'
+      'peerMissing'
     ]
 
-  set_address: (address) ->
+  setAddress: (address) ->
     @address = new Address address
     @socket.write "ADDRESS #{address}\n"
-    @set_state @states.address_sent
+    @setState @states.addressSent
 
-  request_address: ->
+  requestAddress: ->
     @socket.write "REQUEST\n"
-    @set_state @states.address_requested
+    @setState @states.addressRequested
 
   connect: (address) ->
     @socket.write "CONNECT #{address}\n"

@@ -2,8 +2,8 @@ net = require 'net'
 mysql = require './mysql'
 ServerToClientConnection = require './server_to_client_connection'
 
-exports.createServer = (port, mysql_options, callback) ->
-  mysql.createConnection mysql_options, (error) ->
+exports.createServer = (port, mysqlOptions, callback) ->
+  mysql.createConnection mysqlOptions, (error) ->
     return callback(error) if error
     server = net.createServer (c) ->
       new ServerToClientConnection c

@@ -16,9 +16,9 @@ client = new foonet.Client 8000, 'localhost', (connection) ->
   getAddress = (chunk) ->
     try
       if chunk.length == 1
-        connection.request_address()
+        connection.requestAddress()
       else
-        connection.set_address chunk.toString('utf8', 0, chunk.length - 1)
+        connection.setAddress chunk.toString('utf8', 0, chunk.length - 1)
       process.stdout.write 'Input remote host address or press enter to wait: '
       process.stdin.once 'data', connectOrWait
     catch e

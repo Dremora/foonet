@@ -16,8 +16,8 @@ module.exports = class Client extends events.EventEmitter
       Math.floor(Math.random() * 16384) + 49152
     ]
 
-    current_port = 0
-    @port = ports[current_port]
+    currentPort = 0
+    @port = ports[currentPort]
 
     @accepting = {}
 
@@ -44,9 +44,9 @@ module.exports = class Client extends events.EventEmitter
               console.log "Port #{@port} is in use"
             when 'EACCES'
               console.log "Access denied for listening on port #{@port}"
-          current_port++
-          if current_port < ports.length
-            @port = ports[current_port]
+          currentPort++
+          if currentPort < ports.length
+            @port = ports[currentPort]
             @server.listen(@port)
         else throw error
 
@@ -60,7 +60,7 @@ module.exports = class Client extends events.EventEmitter
         callback(connection)
 
   # Associate incoming connection from `ip' with `address' and `key'.
-  accept_from: (address, protocol, ip, key) ->
+  acceptFrom: (address, protocol, ip, key) ->
     switch protocol
       when 'TCP'
         @accepting["#{ip}_#{key}"] = address
@@ -68,7 +68,7 @@ module.exports = class Client extends events.EventEmitter
         throw new Error 'Not implemented' # TODO
 
   # Connect to `ip':`port' and associate this host with `address' and `key'.
-  connect_to: (address, protocol, ip, port, key) ->
+  connectTo: (address, protocol, ip, port, key) ->
     switch protocol
       when 'TCP'
         socket = new net.Socket

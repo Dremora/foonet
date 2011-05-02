@@ -2,7 +2,7 @@ module.exports = class CommandConnection
   constructor: (@socket) ->
     @socket.setEncoding 'utf8'
     @buffer = []
-    @state = @states.not_authenticated
+    @state = @states.notAuthenticated
     @socket.on 'data', (data) =>
       @received(data)
 
@@ -21,5 +21,5 @@ module.exports = class CommandConnection
 
       @socket.end("Unknown command - #{command}\n")
 
-  set_state: (state) ->
+  setState: (state) ->
     @state = state

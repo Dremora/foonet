@@ -1,6 +1,6 @@
 mysql = require 'mysql'
 
-exports.createConnection = (mysql_options, cb) ->
-  connection = new mysql.Client mysql_options
+exports.createConnection = (mysqlOptions, cb) ->
+  connection = new mysql.Client mysqlOptions
   exports.connection = connection
   connection.connect cb
