@@ -1,5 +1,5 @@
 net = require 'net'
-events = require('events')
+events = require 'events'
 ClientToServerConnection = require './client_to_server_connection'
 
 # Represents a local client. Holds connection to the address master, performs
