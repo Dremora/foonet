@@ -70,7 +70,14 @@ module.exports = class ServerToClientConnection extends CommandConnection
     'acceptingConnections',
     (address) ->
       if peer = clients[address]
-        peer.socket.write "PEER #{@address} IN TCP #{@socket.remoteAddress}\n"
+        # TCP connection is established if at least one of peers supports it
+        if peer.port
+          peer.socket.write "PEER #{@address} IN TCP #{@socket.remoteAddress}\n"
+        else if @port
+          @socket.write "PEER #{peer.address} IN TCP #{peer.socket.remoteAddress}\n"
+        # If both peers don't support TCP, fallback to UDP hole punching
+        else
+          throw new Error 'Not implemented' # TODO
       else
         @socket.write "PEER #{address} MISSING\n"
 
