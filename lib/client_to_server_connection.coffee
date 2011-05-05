@@ -5,6 +5,7 @@ module.exports = class ClientToServerConnection extends CommandConnection
   @state 'notAuthenticated'
   @state 'addressRequested'
   @state 'addressSent'
+  @state 'capabilitiesSent'
   @state 'authenticated'
 
   @command /^ADDRESS ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2})$/,
@@ -13,20 +14,34 @@ module.exports = class ClientToServerConnection extends CommandConnection
       @address = new Address address
       console.log "Received address #{address}"
       @socket.write "CAPABILITIES TCP #{@client.port}\n"
-      @setState 'authenticated'
+      @setState 'capabilitiesSent'
 
   @command /^AUTHENTICATED$/,
     'addressSent',
     ->
       console.log 'Authenticated'
       @socket.write "CAPABILITIES TCP #{@client.port}\n"
-      @setState 'authenticated'
+      @setState 'capabilitiesSent'
 
   @command /^NOT AUTHENTICATED$/,
     'addressSent',
     ->
       console.log 'Not authenticated'
       @setState 'notAuthenticated'
+
+  @command /^CONNECTION ERROR$/,
+    'capabilitiesSent',
+    ->
+      console.log 'TCP connection not possible'
+      @client.server.removeAllListeners('connection')
+      @client.server.close()
+      @setState 'authenticated'
+
+  @command /^CONNECTION OK$/,
+    'capabilitiesSent',
+    ->
+      console.log 'TCP OK'
+      @setState 'authenticated'
 
   # Received when a remote host with specified `address' wants to connect
   # to the local host or vice versa, when local host should wait for

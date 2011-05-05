@@ -1,3 +1,4 @@
+net = require 'net'
 Address = require './address'
 CommandConnection = require './command_connection'
 
@@ -8,7 +9,8 @@ module.exports = class ServerToClientConnection extends CommandConnection
   @state 'notAuthenticated'
   @state 'receivedAddressRequest'
   @state 'authenticated'
-  @state 'receivedCapabilities'
+  @state 'testingCapabilities'
+  @state 'acceptingConnections'
 
   @command /^ADDRESS ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2})$/,
     'notAuthenticated',
@@ -38,13 +40,34 @@ module.exports = class ServerToClientConnection extends CommandConnection
   # authentication.
   @command /^CAPABILITIES (TCP|UDP) ([0-9]{1,5})$/,
     'authenticated',
-    (@protocol, port) ->
-      @port = parseInt(port) # TODO: check range
-      @setState 'receivedCapabilities'
+    (protocol, port) ->
+      port = parseInt(port) # TODO: check range
+      @setState 'testingCapabilities'
+
+      # Client will receive reply when:
+      # 1) Connection is successful, or
+      # 2) Connection hasn't been established in 5 seconds, or
+      # 3) There was an error during connection (e.g. connection refused)
+      connection = net.createConnection port, @socket.remoteAddress
+      timer = setTimeout ->
+        connection.end() # destroy()? drop event handlers?
+        @socket.write "CONNECTION ERROR\n"
+        @setState 'acceptingConnections'
+      , 5000
+      connection.on 'connect', =>
+        clearTimeout(timer)
+        connection.end("ok")
+        @port = port
+        @socket.write "CONNECTION OK\n"
+        @setState 'acceptingConnections'
+      connection.on 'error', (error) =>
+        clearTimeout(timer)
+        @socket.write "CONNECTION ERROR\n"
+        @setState 'acceptingConnections'
 
   # Received when peer wants to connect to another peer.
   @command /^CONNECT ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2})$/,
-    'receivedCapabilities',
+    'acceptingConnections',
     (address) ->
       if peer = clients[address]
         peer.socket.write "PEER #{@address} IN TCP #{@socket.remoteAddress}\n"
@@ -55,7 +78,7 @@ module.exports = class ServerToClientConnection extends CommandConnection
   # one.
   # TODO: make sure CONNECT has been issued before from either peer.
   @command /^WAITING ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2}) ([0-9]{16})$/,
-    'receivedCapabilities',
+    'acceptingConnections',
     (address, key) ->
       if peer = clients[address]
         peer.socket.write "PEER #{@address} OUT TCP #{@socket.remoteAddress} #{@port} #{key}\n"

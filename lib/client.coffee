@@ -1,3 +1,4 @@
+dns = require 'dns'
 net = require 'net'
 events = require 'events'
 ClientToServerConnection = require './client_to_server_connection'
@@ -9,6 +10,13 @@ ClientToServerConnection = require './client_to_server_connection'
 # `peerMissing', when requested peer is not available
 module.exports = class Client extends events.EventEmitter
   constructor: (port, host, callback) ->
+    if net.isIP(host)
+      @initialize port, host, callback
+    else
+      dns.lookup host, (error, address, family) =>
+        @initialize port, address, callback
+
+  initialize: (port, host, callback) ->
     ports = [
       80
       443
@@ -21,7 +29,9 @@ module.exports = class Client extends events.EventEmitter
 
     @accepting = {}
 
-    @server = net.createServer (socket) =>
+    # Will replace default callback after successful connection from remote
+    # server.
+    clientCallback = (socket) =>
       key = ""
       received = (data) =>
         key += data.toString('utf8')
@@ -35,6 +45,16 @@ module.exports = class Client extends events.EventEmitter
           else
             socket.end()
       socket.once 'data', received
+
+    # Waits till remote server connects, then replaces the callback.
+    @server = net.createServer (socket) =>
+      socket.on 'error', (error) =>
+        console.log error.message
+
+      if socket.remoteAddress == host
+        @server.removeAllListeners 'connection'
+        @server.on 'connection', clientCallback
+      socket.end()
 
     @server.on 'error', (error) =>
       switch error.code
