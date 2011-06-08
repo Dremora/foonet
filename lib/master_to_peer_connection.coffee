@@ -1,28 +1,28 @@
 net = require 'net'
-Address = require './address'
+Id = require './id'
 CommandConnection = require './command_connection'
 
-# Hash with authenticated clients
-clients = {}
+# Hash with authenticated peers
+peers = {}
 
-module.exports = class ServerToClientConnection extends CommandConnection
+module.exports = class MasterToPeerConnection extends CommandConnection
   @state 'notAuthenticated'
-  @state 'receivedAddressRequest'
+  @state 'receivedIdRequest'
   @state 'authenticated'
   @state 'testingCapabilities'
   @state 'acceptingConnections'
 
-  @command /^ADDRESS ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2})$/,
+  @command /^ID ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2})$/,
     'notAuthenticated',
-    (address) ->
-      @setState 'receivedAddressRequest'
-      address = new Address(address)
-      if clients[address]
+    (id) ->
+      @setState 'receivedIdRequest'
+      id = new Id(id)
+      if peers[id]
         @socket.write "NOT AUTHENTICATED\n"
         @setState 'notAuthenticated'
-      else address.find (exists) =>
+      else id.find (exists) =>
         if exists
-          @setAddress(address)
+          @setId(id)
           @socket.write "AUTHENTICATED\n"
         else
           @socket.write "NOT AUTHENTICATED\n"
@@ -31,12 +31,12 @@ module.exports = class ServerToClientConnection extends CommandConnection
   @command /^REQUEST$/,
     'notAuthenticated',
     ->
-      @setState 'receivedAddressRequest'
-      Address.create (address) =>
-        @setAddress(address)
-        @socket.write "ADDRESS #{address}\n"
+      @setState 'receivedIdRequest'
+      Id.create (id) =>
+        @setId(id)
+        @socket.write "ID #{id}\n"
 
-  # Connectivity capabilities of client, received right after successful
+  # Connectivity capabilities of peer, received right after successful
   # authentication.
   @command /^CAPABILITIES (TCP|UDP) ([0-9]{1,5})$/,
     'authenticated',
@@ -44,7 +44,7 @@ module.exports = class ServerToClientConnection extends CommandConnection
       port = parseInt(port) # TODO: check range
       @setState 'testingCapabilities'
 
-      # Client will receive reply when:
+      # Peer will receive reply when:
       # 1) Connection is successful, or
       # 2) Connection hasn't been established in 5 seconds, or
       # 3) There was an error during connection (e.g. connection refused)
@@ -68,34 +68,34 @@ module.exports = class ServerToClientConnection extends CommandConnection
   # Received when peer wants to connect to another peer.
   @command /^CONNECT ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2})$/,
     'acceptingConnections',
-    (address) ->
-      if peer = clients[address]
+    (id) ->
+      if peer = peers[id]
         # TCP connection is established if at least one of peers supports it
         if peer.port
-          peer.socket.write "PEER #{@address} IN TCP #{@socket.remoteAddress}\n"
+          peer.socket.write "PEER #{@id} IN TCP #{@socket.remoteAddress}\n"
         else if @port
-          @socket.write "PEER #{peer.address} IN TCP #{peer.socket.remoteAddress}\n"
+          @socket.write "PEER #{peer.id} IN TCP #{peer.socket.remoteAddress}\n"
         # If both peers don't support TCP, fallback to UDP hole punching
         else
           throw new Error 'Not implemented' # TODO
       else
-        @socket.write "PEER #{address} MISSING\n"
+        @socket.write "PEER #{id} MISSING\n"
 
   # Received when one of the peers is accepting connections from the other
   # one.
   # TODO: make sure CONNECT has been issued before from either peer.
   @command /^WAITING ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2}) ([0-9]{16})$/,
     'acceptingConnections',
-    (address, key) ->
-      if peer = clients[address]
-        peer.socket.write "PEER #{@address} OUT TCP #{@socket.remoteAddress} #{@port} #{key}\n"
+    (id, key) ->
+      if peer = peers[id]
+        peer.socket.write "PEER #{@id} OUT TCP #{@socket.remoteAddress} #{@port} #{key}\n"
       else
-        @socket.write "PEER #{address} MISSING\n"
+        @socket.write "PEER #{id} MISSING\n"
 
-  setAddress: (@address) ->
-    clients[@address] = @
-    console.log "Client #{address} identified"
+  setId: (@id) ->
+    peers[@id] = @
+    console.log "Peer #{id} identified"
     @socket.on 'close', =>
-      delete clients[@address]
-      console.log "Client #{address} quit"
+      delete peers[@id]
+      console.log "Peer #{id} quit"
     @setState 'authenticated'

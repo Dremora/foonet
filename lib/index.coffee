@@ -1,14 +1,14 @@
 net = require 'net'
 mysql = require './mysql'
-ServerToClientConnection = require './server_to_client_connection'
+MasterToPeerConnection = require './master_to_peer_connection'
 
-exports.createServer = (port, mysqlOptions, callback) ->
+exports.createMaster = (port, mysqlOptions, callback) ->
   mysql.createConnection mysqlOptions, (error) ->
     return callback(error) if error
     server = net.createServer (c) ->
-      new ServerToClientConnection c
+      new MasterToPeerConnection c
 
-    # Error handling - currently address in use only
+    # Error handling - currently id in use only
     server.on 'error', (error) ->
       if error.code == 'EADDRINUSE'
         callback(error)
@@ -16,7 +16,7 @@ exports.createServer = (port, mysqlOptions, callback) ->
 
     # Begin listening
     server.listen port, ->
-      console.log "Server running at localhost:#{port}"
+      console.log "Master running at localhost:#{port}"
       callback()
 
-exports.Client = require './client'
+exports.Peer = require './peer'

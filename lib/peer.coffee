@@ -1,20 +1,20 @@
 dns = require 'dns'
 net = require 'net'
 events = require 'events'
-ClientToServerConnection = require './client_to_server_connection'
+PeerToMasterConnection = require './peer_to_master_connection'
 
-# Represents a local client. Holds connection to the address master, performs
+# Represents a local peer. Holds connection to the master, performs
 # and accepts connections to and from remote hosts.
 # Fired events:
 # `peer', when connection with another peer has beenestablished
 # `peerMissing', when requested peer is not available
-module.exports = class Client extends events.EventEmitter
+module.exports = class Peer extends events.EventEmitter
   constructor: (port, host, callback) ->
     if net.isIP(host)
       @initialize port, host, callback
     else
-      dns.lookup host, (error, address, family) =>
-        @initialize port, address, callback
+      dns.lookup host, (error, id, family) =>
+        @initialize port, id, callback
 
   initialize: (port, host, callback) ->
     ports = [
@@ -29,31 +29,30 @@ module.exports = class Client extends events.EventEmitter
 
     @accepting = {}
 
-    # Will replace default callback after successful connection from remote
-    # server.
-    clientCallback = (socket) =>
+    # Will replace default callback after successful connection from master.
+    peerCallback = (socket) =>
       key = ""
       received = (data) =>
         key += data.toString('utf8')
         if key.length < 16
           socket.once 'data', received
         else
-          if address = @accepting["#{socket.remoteAddress}_#{key}"]
+          if id = @accepting["#{socket.remoteAddress}_#{key}"]
             socket.on 'close', =>
               delete @accepting["#{socket.remoteAddress}_#{key}"]
-            @emit 'peer', address, socket
+            @emit 'peer', id, socket
           else
             socket.end()
       socket.once 'data', received
 
-    # Waits till remote server connects, then replaces the callback.
+    # Waits till master connects, then replaces the callback.
     @server = net.createServer (socket) =>
       socket.on 'error', (error) =>
         console.log error.message
 
       if socket.remoteAddress == host
         @server.removeAllListeners 'connection'
-        @server.on 'connection', clientCallback
+        @server.on 'connection', peerCallback
       socket.end()
 
     @server.on 'error', (error) =>
@@ -74,26 +73,26 @@ module.exports = class Client extends events.EventEmitter
       console.log "Server running at localhost:#{@port}"
       socket = new net.Socket
       socket.connect port, host, =>
-        connection = new ClientToServerConnection socket
-        connection.client = @
+        connection = new PeerToMasterConnection socket
+        connection.peer = @
         console.log "Connected to #{host}:#{port}"
         callback(connection)
 
-  # Associate incoming connection from `ip' with `address' and `key'.
-  acceptFrom: (address, protocol, ip, key) ->
+  # Associate incoming connection from `ip' with `id' and `key'.
+  acceptFrom: (id, protocol, ip, key) ->
     switch protocol
       when 'TCP'
-        @accepting["#{ip}_#{key}"] = address
+        @accepting["#{ip}_#{key}"] = id
       when 'UDP'
         throw new Error 'Not implemented' # TODO
 
-  # Connect to `ip':`port' and associate this host with `address' and `key'.
-  connectTo: (address, protocol, ip, port, key) ->
+  # Connect to `ip':`port' and associate this host with `id' and `key'.
+  connectTo: (id, protocol, ip, port, key) ->
     switch protocol
       when 'TCP'
         socket = new net.Socket
         socket.connect port, ip, =>
           socket.write key
-          @emit 'peer', address, socket
+          @emit 'peer', id, socket
       when 'UDP'
         throw new Error 'Not implemented' # TODO

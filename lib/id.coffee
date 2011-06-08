@@ -1,11 +1,11 @@
 mysql = require './mysql'
 
-module.exports = class Address
-  constructor: (address) ->
-    switch typeof address
+module.exports = class Id
+  constructor: (id) ->
+    switch typeof id
       when 'string'
-        unless matches = /^([0-9a-f]{2})\:([0-9a-f]{2})\:([0-9a-f]{2})\:([0-9a-f]{2})$/.exec address
-          throw new Error 'Error parsing address'
+        unless matches = /^([0-9a-f]{2})\:([0-9a-f]{2})\:([0-9a-f]{2})\:([0-9a-f]{2})$/.exec id
+          throw new Error 'Error parsing id'
         matches.splice(0, 1)
         @buffer = new Buffer(4)
         for i in [0...matches.length]
@@ -16,7 +16,7 @@ module.exports = class Address
       when 'number'
         @buffer = new Buffer(4)
         for i in [0...@buffer.length]
-          @buffer[i] = address >> (8 * (3 - i)) & 0xFF
+          @buffer[i] = id >> (8 * (3 - i)) & 0xFF
 
   toString: ->
     r = []
@@ -34,12 +34,12 @@ module.exports = class Address
     results
 
   find: (callback) ->
-    mysql.connection.query 'SELECT * FROM addresses WHERE address = ?',
+    mysql.connection.query 'SELECT * FROM ids WHERE id = ?',
     [@toNumber()], (error, results) ->
       throw error if error
       callback(results.length > 0)
 
-Address.create = (callback) ->
-  mysql.connection.query 'INSERT INTO addresses VALUES()', (error, results) ->
+Id.create = (callback) ->
+  mysql.connection.query 'INSERT INTO ids VALUES()', (error, results) ->
     throw error if error
-    callback(new Address(results.insertId))
+    callback(new Id(results.insertId))
