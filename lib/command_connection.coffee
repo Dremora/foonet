@@ -1,4 +1,6 @@
-module.exports = class CommandConnection
+events = require 'events'
+
+module.exports = class CommandConnection extends events.EventEmitter
   constructor: (@socket) ->
     @socket.setEncoding 'utf8'
     @buffer = []
