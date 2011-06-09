@@ -2,9 +2,6 @@ net = require 'net'
 Id = require './id'
 CommandConnection = require './command_connection'
 
-# Hash with authenticated peers
-peers = {}
-
 module.exports = class MasterToPeerConnection extends CommandConnection
   @state 'notAuthenticated'
   @state 'receivedIdRequest'
@@ -16,17 +13,7 @@ module.exports = class MasterToPeerConnection extends CommandConnection
     'notAuthenticated',
     (id) ->
       @setState 'receivedIdRequest'
-      id = new Id(id)
-      if peers[id]
-        @socket.write "NOT AUTHENTICATED\n"
-        @setState 'notAuthenticated'
-      else id.find (exists) =>
-        if exists
-          @setId(id)
-          @socket.write "AUTHENTICATED\n"
-        else
-          @socket.write "NOT AUTHENTICATED\n"
-          @setState 'notAuthenticated'
+      @emit 'id', new Id(id)
 
   @command /^REQUEST$/,
     'notAuthenticated',
@@ -69,17 +56,7 @@ module.exports = class MasterToPeerConnection extends CommandConnection
   @command /^CONNECT ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2})$/,
     'acceptingConnections',
     (id) ->
-      if peer = peers[id]
-        # TCP connection is established if at least one of peers supports it
-        if peer.port
-          peer.socket.write "PEER #{@id} IN TCP #{@socket.remoteAddress}\n"
-        else if @port
-          @socket.write "PEER #{peer.id} IN TCP #{peer.socket.remoteAddress}\n"
-        # If both peers don't support TCP, fallback to UDP hole punching
-        else
-          throw new Error 'Not implemented' # TODO
-      else
-        @socket.write "PEER #{id} MISSING\n"
+      @emit 'connect', id
 
   # Received when one of the peers is accepting connections from the other
   # one.
@@ -87,15 +64,26 @@ module.exports = class MasterToPeerConnection extends CommandConnection
   @command /^WAITING ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2}) ([0-9]{16})$/,
     'acceptingConnections',
     (id, key) ->
-      if peer = peers[id]
-        peer.socket.write "PEER #{@id} OUT TCP #{@socket.remoteAddress} #{@port} #{key}\n"
-      else
-        @socket.write "PEER #{id} MISSING\n"
+      @emit 'waiting' , id, key
 
   setId: (@id) ->
-    peers[@id] = @
-    console.log "Peer #{id} identified"
+    @emit 'setId', id
     @socket.on 'close', =>
-      delete peers[@id]
-      console.log "Peer #{id} quit"
+      @emit 'close'
     @setState 'authenticated'
+
+  peerMissing: (id) ->
+    @socket.write "PEER #{id} MISSING\n"
+
+  authenticated: ->
+    @socket.write "AUTHENTICATED\n"
+
+  notAuthenticated: ->
+    @socket.write "NOT AUTHENTICATED\n"
+    @setState 'notAuthenticated'
+
+  peerIn: (peer) ->
+    @socket.write "PEER #{peer.id} IN TCP #{peer.socket.remoteAddress}\n"
+
+  peerOut: (peer, key) ->
+    @socket.write "PEER #{peer.id} OUT TCP #{peer.socket.remoteAddress} #{peer.port} #{key}\n"
