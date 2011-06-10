@@ -48,3 +48,6 @@ module.exports = class CommandConnection extends events.EventEmitter
 
   setState: (state) ->
     @state = @states[state]
+
+  send: (command) ->
+    @socket.write "#{command}\n"
