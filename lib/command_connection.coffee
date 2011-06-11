@@ -26,7 +26,7 @@ module.exports = class CommandConnection extends events.EventEmitter
   # Adds a new state to the class. Should not be used after `@command'.
   @state: (state) ->
     @::states ?= {}
-    @::states_count ?= 0
+    @states_count ?= 0
     @::states[state] = @states_count
 
     @::transitions ?= []
