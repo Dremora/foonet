@@ -1,4 +1,5 @@
 Id = require './id'
+Key = require './key'
 CommandConnection = require './command_connection'
 
 module.exports = class PeerToMasterConnection extends CommandConnection
@@ -73,9 +74,7 @@ module.exports = class PeerToMasterConnection extends CommandConnection
   @command /^PEER ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2}) IN (TCP|UDP) ((?:[0-9]{1,3}\.){3}[0-9]{1,3})$/,
     'acceptingConnections',
     (id, protocol, ip) ->
-      key = Math.floor(Math.random() * 10000000000000000).toString()
-      while key.length < 16
-        key = '0' + key
+      key = Key.generate()
       @emit 'acceptFrom', id, protocol, ip, key
       @send "WAITING #{id} #{key}"
 
