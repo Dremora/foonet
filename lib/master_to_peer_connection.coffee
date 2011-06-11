@@ -3,11 +3,22 @@ Id = require './id'
 CommandConnection = require './command_connection'
 
 module.exports = class MasterToPeerConnection extends CommandConnection
+
+  supports: (name) ->
+    @capabilities ?= {}
+    @capabilities.hasOwnProperty(name)
+
+  capability: (name) ->
+    @capabilities ?= {}
+    @capabilities[name] = true
+
   @state 'notAuthenticated'
   @state 'receivedIdRequest'
-  @state 'authenticated'
-  @state 'testingCapabilities'
+  @state 'waitingCapabilitiesTCP'
+  @state 'testingCapabilitiesTCP'
   @state 'acceptingConnections'
+
+  # Authentication/registration
 
   @command /^ID ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2})$/,
     'notAuthenticated',
@@ -21,15 +32,30 @@ module.exports = class MasterToPeerConnection extends CommandConnection
       @setState 'receivedIdRequest'
       Id.create (id) =>
         @setId(id)
-        @socket.write "ID #{id}\n"
+        @send "ID #{id}"
+
+  setId: (@id) ->
+    @emit 'setId', id
+    @socket.on 'close', =>
+      @emit 'close'
+
+  authenticated: ->
+    @send "AUTHENTICATED"
+    @setState 'waitingCapabilitiesTCP'
+
+  notAuthenticated: ->
+    @send "NOT AUTHENTICATED"
+    @setState 'notAuthenticated'
+
+  # Testing incoming TCP connection
 
   # Connectivity capabilities of peer, received right after successful
   # authentication.
-  @command /^CAPABILITIES (TCP|UDP) ([0-9]{1,5})$/,
-    'authenticated',
-    (protocol, port) ->
+  @command /^LISTENING TCP ([0-9]{1,5})$/,
+    'waitingCapabilitiesTCP',
+    (port) ->
       port = parseInt(port) # TODO: check range
-      @setState 'testingCapabilities'
+      @setState 'testingCapabilitiesTCP'
 
       # Peer will receive reply when:
       # 1) Connection is successful, or
@@ -38,19 +64,33 @@ module.exports = class MasterToPeerConnection extends CommandConnection
       connection = net.createConnection port, @socket.remoteAddress
       timer = setTimeout ->
         connection.end() # destroy()? drop event handlers?
-        @socket.write "CONNECTION ERROR\n"
-        @setState 'acceptingConnections'
+        @notConnectedTCP()
       , 5000
       connection.on 'connect', =>
         clearTimeout(timer)
         connection.end("ok")
         @port = port
-        @socket.write "CONNECTION OK\n"
-        @setState 'acceptingConnections'
+        @connectedTCP()
       connection.on 'error', (error) =>
         clearTimeout(timer)
-        @socket.write "CONNECTION ERROR\n"
-        @setState 'acceptingConnections'
+        @notConnectedTCP()
+
+  # Peer was unable to begin listening
+  @command /^ERROR$/,
+    'waitingCapabilitiesTCP',
+    ->
+      @setState 'acceptingConnections'
+
+  connectedTCP: ->
+    @capability 'incomingTCP'
+    @send 'OK'
+    @setState 'acceptingConnections'
+
+  notConnectedTCP: ->
+    @send 'ERROR'
+    @setState 'acceptingConnections'
+
+  # Accepting incoming connections
 
   # Received when peer wants to connect to another peer.
   @command /^CONNECT ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2})$/,
@@ -66,24 +106,11 @@ module.exports = class MasterToPeerConnection extends CommandConnection
     (id, key) ->
       @emit 'waiting' , id, key
 
-  setId: (@id) ->
-    @emit 'setId', id
-    @socket.on 'close', =>
-      @emit 'close'
-    @setState 'authenticated'
-
   peerMissing: (id) ->
-    @socket.write "PEER #{id} MISSING\n"
-
-  authenticated: ->
-    @socket.write "AUTHENTICATED\n"
-
-  notAuthenticated: ->
-    @socket.write "NOT AUTHENTICATED\n"
-    @setState 'notAuthenticated'
+    @send "PEER #{id} MISSING"
 
   peerIn: (peer) ->
-    @socket.write "PEER #{peer.id} IN TCP #{peer.socket.remoteAddress}\n"
+    @send "PEER #{peer.id} IN TCP #{peer.socket.remoteAddress}"
 
   peerOut: (peer, key) ->
-    @socket.write "PEER #{peer.id} OUT TCP #{peer.socket.remoteAddress} #{peer.port} #{key}\n"
+    @send "PEER #{peer.id} OUT TCP #{peer.socket.remoteAddress} #{peer.port} #{key}"

@@ -38,9 +38,9 @@ module.exports = class Master
       peer.on 'connect', (id) =>
         if other = @peers[id]
           # TCP connection is established if at least one of peers supports it
-          if other.port
+          if other.supports 'incomingTCP'
             other.peerIn peer
-          else if peer.port
+          else if peer.supports 'incomingTCP'
             peer.peerIn other
           # If both peers don't support TCP, fallback to UDP hole punching
           else
