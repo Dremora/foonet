@@ -26,25 +26,25 @@ module.exports = class CommandConnection extends events.EventEmitter
   # Adds a new state to the class. Should not be used after `@command'.
   @state: (state) ->
     @::states ?= {}
-    @states_count ?= 0
-    @::states[state] = @states_count
+    @statesCount ?= 0
+    @::states[state] = @statesCount
 
     @::transitions ?= []
-    @::transitions[@states_count] = []
+    @::transitions[@statesCount] = []
 
-    @states_count = @states_count + 1
+    @statesCount = @statesCount + 1
 
   # Defines a new `action' as a response to the `command' regex for the
   # specified `states' (can be either a single state or an array).
   @command: (command, states, action) ->
     @::actions ?= []
-    @actions_count ?= 0
+    @actionsCount ?= 0
     @::actions.push [command, action]
 
     for state in (if states instanceof Array then states else [states])
-      @::transitions[@::states[state]].push @actions_count
+      @::transitions[@::states[state]].push @actionsCount
 
-    @actions_count = @actions_count + 1
+    @actionsCount = @actionsCount + 1
 
   setState: (state) ->
     @state = @states[state]
