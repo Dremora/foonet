@@ -36,7 +36,7 @@ module.exports = class Master
           peer.peerMissing id
 
       peer.on 'connect', (id) =>
-        if other = @peers[id]
+        if (other = @peers[id])?.isState('acceptingConnections')
           # TCP connection is established if at least one of peers supports it
           if other.supports 'incomingTCP'
             other.peerIn peer
@@ -51,7 +51,6 @@ module.exports = class Master
     mysql.createConnection mysqlOptions, (error) ->
       return callback(error) if error
       server = net.createServer(peerHandler)
-
 
       # Error handling - currently id in use only
       server.on 'error', (error) ->
