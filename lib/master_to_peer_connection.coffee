@@ -33,6 +33,7 @@ module.exports = class MasterToPeerConnection extends CommandConnection
       Id.create (id) =>
         @setId(id)
         @send "ID #{id}"
+        @setState 'waitingCapabilitiesTCP'
 
   setId: (@id) ->
     @emit 'setId', id
@@ -62,13 +63,13 @@ module.exports = class MasterToPeerConnection extends CommandConnection
       # 2) Connection hasn't been established in 5 seconds, or
       # 3) There was an error during connection (e.g. connection refused)
       connection = net.createConnection port, @socket.remoteAddress
-      timer = setTimeout ->
-        connection.end() # destroy()? drop event handlers?
+      timer = setTimeout =>
+        connection.destroy()
         @notConnectedTCP()
       , 5000
       connection.on 'connect', =>
         clearTimeout(timer)
-        connection.end("ok")
+        connection.end()
         @port = port
         @connectedTCP()
       connection.on 'error', (error) =>
