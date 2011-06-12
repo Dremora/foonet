@@ -1,11 +1,12 @@
+events = require 'events'
 mysql = require './mysql'
 net = require 'net'
 Key = require './key'
 MasterToPeerConnection = require './master_to_peer_connection'
 MasterToGateConnection = require './master_to_gate_connection'
 
-module.exports = class Master
-  constructor: (@peerPort, @gatePort, mysqlOptions, @key, @errorCallback) ->
+module.exports = class Master extends events.EventEmitter
+  constructor: (@peerPort, @gatePort, mysqlOptions, @key) ->
 
     # Hash with authenticated peers
     @peers = {}
@@ -20,22 +21,22 @@ module.exports = class Master
 
   createMySQLServer: (options) ->
     mysql.createConnection options, (error) =>
-      return @errorCallback(error) if error
+      @emit 'error', error if error
       @createGateServer()
 
   createGateServer: ->
     gateServer = net.createServer (socket) => @gateConnection(socket)
-    gateServer.on 'error', (error) => @errorCallback(error)
+    gateServer.on 'error', (error) => @emit 'error', error
     gateServer.listen @gatePort, =>
       console.log "Waiting for gates on localhost:#{@gatePort}"
       @createPeerServer()
 
   createPeerServer: ->
     server = net.createServer (socket) => @peerConnection(socket)
-    server.on 'error', (error) => @errorCallback(error)
+    server.on 'error', (error) => @emit 'error', error
     server.listen @peerPort, =>
       console.log "Waiting for peers at localhost:#{@peerPort}"
-      @errorCallback()
+      @emit 'ready'
 
   # Called when a new gate makes connection to the master
   gateConnection: (socket) ->

@@ -5,18 +5,18 @@ GateToMasterConnection = require './gate_to_master_connection'
 GateToPeerConnection = require './gate_to_peer_connection'
 
 module.exports = class Gate extends events.EventEmitter
-  constructor: (@masterAddress, @masterPort, @key, @listenPort, @errorCallback) ->
+  constructor: (@masterAddress, @masterPort, @key, @listenPort) ->
     @peers = {}
     @connections = {}
     @createServer(listenPort)
 
   createServer: (port) ->
     @server = net.createServer (socket) => socket.end()
-    @server.on 'error', (error) => @errorCallback(error)
+    @server.on 'error', (error) => @emit 'error', error
     @server.listen port, =>
       console.log "Gate running at localhost:#{port}"
       socket = net.createConnection @masterAddress, @masterPort
-      socket.on 'error', (error) => @errorCallback(error)
+      socket.on 'error', (error) => @emit 'error', error
       socket.on 'connect', => @masterConnection(socket)
 
   # Called when connection with master has been established.
@@ -28,6 +28,7 @@ module.exports = class Gate extends events.EventEmitter
       console.log 'Authenticated'
       @server.removeAllListeners 'connection'
       @server.on 'connection', (socket) => @peerConnection(socket)
+      @emit 'ready'
 
     @master.on 'notAuthenticated', =>
       console.log 'Authentication error'
