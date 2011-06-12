@@ -11,17 +11,18 @@ module.exports = class CommandConnection extends events.EventEmitter
   received: (data) ->
     @buffer.push x for x in data
     while matches = /^([^\n]+)\n/.exec @buffer.join('')
-      command = matches[1]
-      @buffer.splice 0, matches[0].length
+      do (matches) =>
+        command = matches[1]
+        @buffer.splice 0, matches[0].length
 
-      for action in @transitions[@state]
-        action = @actions[action]
-        if matches = action[0].exec command
-          matches.splice(0, 1)
-          action[1].apply @, matches
-          return
+        for action in @transitions[@state]
+          action = @actions[action]
+          if matches = action[0].exec command
+            matches.splice(0, 1)
+            action[1].apply @, matches
+            return
 
-      @socket.end("Unknown command - #{command}\n")
+        @socket.end("Unknown command - #{command}\n")
 
   # Adds a new state to the class. Should not be used after `@command'.
   @state: (state) ->
