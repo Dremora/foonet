@@ -3,24 +3,16 @@ Id = require '../lib/id'
 
 peer = new foonet.Peer 8000, 'localhost', (connection) ->
 
-  connectOrWait = (chunk) ->
-    try
-      unless chunk.length == 1
-        id = new Id(chunk.toString('utf8', 0, chunk.length - 1))
-        connection.connect(id)
-      process.stdin.pause()
-    catch e
-      process.stdout.write "Error parsing id, try again: "
-      process.stdin.once 'data', connectOrWait
+peer.on 'error', (error) ->
+  console.log error.message
 
+peer.on 'connect', (connection) ->
   getId = (chunk) ->
     try
       if chunk.length == 1
         connection.requestId()
       else
         connection.setId chunk.toString('utf8', 0, chunk.length - 1)
-      process.stdout.write 'Input remote host id or press enter to wait: '
-      process.stdin.once 'data', connectOrWait
     catch e
       process.stdout.write "#{e}, try again: "
       process.stdin.once 'data', getId
@@ -28,6 +20,21 @@ peer = new foonet.Peer 8000, 'localhost', (connection) ->
   process.stdout.write 'Input id or press enter to get one: '
   process.stdin.resume()
   process.stdin.once 'data', getId
+
+  connectOrWait = (chunk) ->
+    try
+      unless chunk.length == 1
+        id = new Id(chunk.toString('utf8', 0, chunk.length - 1))
+        console.log chunk.toString('utf8', 0, chunk.length - 1)
+        connection.connect(id)
+      process.stdin.pause()
+    catch e
+      process.stdout.write "Error parsing id, try again: "
+      process.stdin.once 'data', connectOrWait
+
+  peer.on 'ready', ->
+    process.stdout.write 'Input remote host id or press enter to wait: '
+    process.stdin.once 'data', connectOrWait
 
   peer.on 'peerMissing', (id) ->
     console.log "Peer #{id} doesn't exist"

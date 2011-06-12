@@ -13,7 +13,7 @@ PeerOutToPeerInConnection = require './peer_out_to_peer_in_connection'
 # `peer', when connection with another peer has beenestablished
 # `peerMissing', when requested peer is not available
 module.exports = class Peer extends events.EventEmitter
-  constructor: (port, host, @callback) ->
+  constructor: (port, host) ->
     if net.isIP(host)
       @initialize(port, host)
     else
@@ -22,10 +22,11 @@ module.exports = class Peer extends events.EventEmitter
 
   initialize: (port, ip) ->
     socket = new net.Socket
+    socket.on 'error', (error) => @emit 'error', (error)
     socket.connect port, ip, =>
       console.log "Connected to #{ip}:#{port}"
       @master = new PeerToMasterConnection socket
-      @callback(@master)
+      @emit 'connect', @master
 
       @master.on 'beginListenTCP', =>
         ports = [
@@ -67,11 +68,13 @@ module.exports = class Peer extends events.EventEmitter
 
       @master.on 'tcpError', =>
         @server.close()
+        @emit 'ready'
 
       @master.on 'tcpOK', =>
         @accepting = {}
         @server.removeAllListeners 'connection'
         @server.on 'connection', (socket) => @peerInConnection(socket)
+        @emit 'ready'
 
       # Associate incoming connection from `ip' with `id' and `key'.
       @master.on 'acceptFrom', (id, protocol, ip, key) =>
