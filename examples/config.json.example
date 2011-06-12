@@ -1,0 +1,19 @@
+{
+	"master": {
+		"host": "localhost",
+		"peerPort": 8000,
+		"gatePort": 8001,
+		"key": "0000000000000000",
+		"mysql": {
+			"host": "localhost",
+			"port": 3306,
+			"user": "",
+			"password": "",
+			"database": ""
+		}
+	},
+	"gate": {
+		"host": "localhost",
+		"port": 9000
+	}
+}

@@ -1,8 +1,7 @@
 foonet = require '..'
-fs = require 'fs'
+config_loaded = require './config_loader'
 
-fs.readFile "#{__dirname}/master_mysql_config.json", (error, data) ->
-  return console.log error.message if error
-  mysqlOptions = JSON.parse data
-  master = new foonet.Master 8000, 8001, mysqlOptions, '9764982319465789'
+config_loaded.load (config) ->
+  master = new foonet.Master config.master.peerPort, config.master.gatePort,
+  config.master.mysql, config.master.gateKey
   master.on 'error', (error) -> console.log error.message

@@ -1,12 +1,13 @@
 foonet = require '..'
 Id = require '../lib/id'
+config_loaded = require './config_loader'
 
-peer = new foonet.Peer 8000, 'localhost', (connection) ->
+config_loaded.load (config) ->
+  peer = new foonet.Peer config.master.peerPort, config.master.host
+  peer.on 'error', (error) -> console.log error.message
+  peer.on 'connect', (connection) => masterConnection(connection, peer)
 
-peer.on 'error', (error) ->
-  console.log error.message
-
-peer.on 'connect', (connection) ->
+masterConnection = (connection, peer) ->
   getId = (chunk) ->
     try
       if chunk.length == 1

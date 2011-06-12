@@ -1,4 +1,7 @@
 foonet = require '..'
+config_loaded = require './config_loader'
 
-gate = new foonet.Gate 8001, 'localhost', '9764982319465789', 9000
-gate.on 'error', (error) -> console.log error.message
+config_loaded.load (config) ->
+  gate = new foonet.Gate config.master.gatePort, config.gate.host,
+  config.master.gateKey, config.gate.peerPort
+  gate.on 'error', (error) -> console.log error.message
