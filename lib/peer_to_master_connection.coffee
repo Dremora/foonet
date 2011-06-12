@@ -47,22 +47,24 @@ module.exports = class PeerToMasterConnection extends CommandConnection
   @command /^ERROR$/,
     'serverIsConnectingTCP',
     ->
-      console.log 'Incoming TCP connections not possible'
+      console.log 'Error'
       @emit 'tcpError'
       @setState 'acceptingConnections'
 
   @command /^OK$/,
     'serverIsConnectingTCP',
     ->
-      console.log 'Receiving incoming TCP connections'
+      console.log 'OK'
       @emit 'tcpOK'
       @setState 'acceptingConnections'
 
   listeningTCP: (port) ->
+    process.stdout.write 'Tecting incoming TCP connections... '
     @send "LISTENING TCP #{port}"
     @setState 'serverIsConnectingTCP'
 
   notListeningTCP: ->
+    console.log 'Incoming TCP connections not possible'
     @send 'ERROR'
     @setState 'acceptingConnections'
 
