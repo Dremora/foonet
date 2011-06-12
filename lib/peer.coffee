@@ -2,6 +2,8 @@ dns = require 'dns'
 net = require 'net'
 events = require 'events'
 PeerToMasterConnection = require './peer_to_master_connection'
+PeerInToPeerOutConnection = require './peer_in_to_peer_out_connection'
+PeerOutToPeerInConnection = require './peer_out_to_peer_in_connection'
 
 # Represents a local peer. Holds connection to the master, performs
 # and accepts connections to and from remote hosts.
@@ -20,10 +22,10 @@ module.exports = class Peer extends events.EventEmitter
     socket = new net.Socket
     socket.connect port, ip, =>
       console.log "Connected to #{ip}:#{port}"
-      connection = new PeerToMasterConnection socket
-      @callback(connection)
+      @master = new PeerToMasterConnection socket
+      @callback(@master)
 
-      connection.on 'beginListenTCP', =>
+      @master.on 'beginListenTCP', =>
         ports = [
           80
           443
@@ -54,36 +56,23 @@ module.exports = class Peer extends events.EventEmitter
               if currentPort < ports.length
                 @port = ports[currentPort]
                 @server.listen(@port)
-              else connection.notListeningTCP()
+              else @master.notListeningTCP()
             else throw error
 
         @server.listen @port, =>
           console.log "Server running at localhost:#{@port}"
-          connection.listeningTCP @port
+          @master.listeningTCP @port
 
-      connection.on 'tcpError', =>
+      @master.on 'tcpError', =>
         @server.close()
 
-      connection.on 'tcpOK', =>
+      @master.on 'tcpOK', =>
         @accepting = {}
         @server.removeAllListeners 'connection'
-        @server.on 'connection', (socket) =>
-          key = ""
-          received = (data) =>
-            key += data.toString('utf8')
-            if key.length < 16
-              socket.once 'data', received
-            else
-              if id = @accepting["#{socket.remoteAddress}_#{key}"]
-                socket.on 'close', =>
-                  delete @accepting["#{socket.remoteAddress}_#{key}"]
-                @emit 'peer', id, socket
-              else
-                socket.end()
-          socket.once 'data', received
+        @server.on 'connection', (socket) => @peerInConnection(socket)
 
       # Associate incoming connection from `ip' with `id' and `key'.
-      connection.on 'acceptFrom', (id, protocol, ip, key) =>
+      @master.on 'acceptFrom', (id, protocol, ip, key) =>
         switch protocol
           when 'TCP'
             @accepting["#{ip}_#{key}"] = id
@@ -91,15 +80,30 @@ module.exports = class Peer extends events.EventEmitter
             throw new Error 'Not implemented' # TODO
 
       # Connect to `ip':`port' and associate this host with `id' and `key'.
-      connection.on 'connectTo', (id, protocol, ip, port, key) =>
+      @master.on 'connectTo', (id, protocol, ip, port, key) =>
         switch protocol
           when 'TCP'
             socket = new net.Socket
             socket.connect port, ip, =>
-              socket.write key
-              @emit 'peer', id, socket
+              @peerOutConnection(socket, id, key)
           when 'UDP'
             throw new Error 'Not implemented' # TODO
 
-      connection.on 'peerMissing', (id) =>
+      @master.on 'peerMissing', (id) =>
         @emit 'peerMissing', id
+
+  peerInConnection: (socket) ->
+    peer = new PeerInToPeerOutConnection(socket)
+    peer.on 'authenticate', (id, key) =>
+      if id == @accepting["#{socket.remoteAddress}_#{key}"]
+        delete @accepting["#{socket.remoteAddress}_#{key}"]
+        peer.authenticated()
+        @emit 'peer', id, socket
+      else peer.notAuthenticated()
+
+  peerOutConnection: (socket, id, key) ->
+    peer = new PeerOutToPeerInConnection(socket)
+    peer.authenticate @master.id, key
+
+    peer.on 'authenticated', =>
+      @emit 'peer', id, socket
