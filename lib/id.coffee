@@ -43,3 +43,8 @@ Id.create = (callback) ->
   mysql.connection.query 'INSERT INTO ids VALUES()', (error, results) ->
     throw error if error
     callback(new Id(results.insertId))
+
+Id.equals = (id1, id2) ->
+  for i in [0..3]
+    return false if id1.buffer[i] != id2.buffer[i]
+  true

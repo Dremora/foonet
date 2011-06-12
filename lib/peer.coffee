@@ -1,7 +1,9 @@
 dns = require 'dns'
 net = require 'net'
 events = require 'events'
+Id = require './id'
 PeerToMasterConnection = require './peer_to_master_connection'
+PeerToGateConnection = require './peer_to_gate_connection'
 PeerInToPeerOutConnection = require './peer_in_to_peer_out_connection'
 PeerOutToPeerInConnection = require './peer_out_to_peer_in_connection'
 
@@ -88,6 +90,10 @@ module.exports = class Peer extends events.EventEmitter
               @peerOutConnection(socket, id, key)
           when 'UDP'
             throw new Error 'Not implemented' # TODO
+          when 'gate'
+            socket = new net.Socket
+            socket.connect port, ip, =>
+              @peerGateConnection(socket, id, key)
 
       @master.on 'peerMissing', (id) =>
         @emit 'peerMissing', id
@@ -95,7 +101,7 @@ module.exports = class Peer extends events.EventEmitter
   peerInConnection: (socket) ->
     peer = new PeerInToPeerOutConnection(socket)
     peer.on 'authenticate', (id, key) =>
-      if id == @accepting["#{socket.remoteAddress}_#{key}"]
+      if Id.equals(id, @accepting["#{socket.remoteAddress}_#{key}"])
         delete @accepting["#{socket.remoteAddress}_#{key}"]
         peer.authenticated()
         @emit 'peer', id, socket
@@ -106,4 +112,11 @@ module.exports = class Peer extends events.EventEmitter
     peer.authenticate @master.id, key
 
     peer.on 'authenticated', =>
+      @emit 'peer', id, socket
+
+  peerGateConnection: (socket, id, key) ->
+    peer = new PeerToGateConnection(socket)
+    peer.authenticate @master.id, key
+
+    peer.on 'ready', =>
       @emit 'peer', id, socket

@@ -96,7 +96,7 @@ module.exports = class MasterToPeerConnection extends CommandConnection
   @command /^CONNECT ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2})$/,
     'acceptingConnections',
     (id) ->
-      @emit 'connect', id
+      @emit 'connect', new Id(id)
 
   # Received when one of the peers is accepting connections from the other
   # one.
@@ -104,7 +104,7 @@ module.exports = class MasterToPeerConnection extends CommandConnection
   @command /^WAITING ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2}) ([0-9]{16})$/,
     'acceptingConnections',
     (id, key) ->
-      @emit 'waiting' , id, key
+      @emit 'waiting' , new Id(id), key
 
   peerMissing: (id) ->
     @send "PEER #{id} MISSING"
@@ -114,3 +114,6 @@ module.exports = class MasterToPeerConnection extends CommandConnection
 
   peerOut: (peer, key) ->
     @send "PEER #{peer.id} OUT TCP #{peer.socket.remoteAddress} #{peer.port} #{key}"
+
+  peerGate: (peer, ip, port, key) ->
+    @send "PEER #{peer.id} GATE #{ip} #{port} #{key}"

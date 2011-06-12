@@ -1,64 +1,115 @@
 mysql = require './mysql'
 net = require 'net'
+Key = require './key'
 MasterToPeerConnection = require './master_to_peer_connection'
+MasterToGateConnection = require './master_to_gate_connection'
 
 module.exports = class Master
-  constructor: (port, mysqlOptions, callback) ->
+  constructor: (@peerPort, @gatePort, mysqlOptions, @key, @errorCallback) ->
 
     # Hash with authenticated peers
     @peers = {}
 
-    # Fired when a new peer is connected
-    peerHandler = (socket) =>
-      peer = new MasterToPeerConnection socket
+    # Authenticated gates
+    @gates = []
 
-      peer.on 'id', (id) =>
-        if @peers[id]
+    # Peers waiting for connection using gate
+    @gateConnections = {}
+
+    @createMySQLServer(mysqlOptions)
+
+  createMySQLServer: (options) ->
+    mysql.createConnection options, (error) =>
+      return @errorCallback(error) if error
+      @createGateServer()
+
+  createGateServer: ->
+    gateServer = net.createServer (socket) => @gateConnection(socket)
+    gateServer.on 'error', (error) => @errorCallback(error)
+    gateServer.listen @gatePort, =>
+      console.log "Waiting for gates on localhost:#{@gatePort}"
+      @createPeerServer()
+
+  createPeerServer: ->
+    server = net.createServer (socket) => @peerConnection(socket)
+    server.on 'error', (error) => @errorCallback(error)
+    server.listen @peerPort, =>
+      console.log "Waiting for peers at localhost:#{@peerPort}"
+      @errorCallback()
+
+  # Called when a new gate makes connection to the master
+  gateConnection: (socket) ->
+    gate = new MasterToGateConnection(socket)
+
+    # Called when gate tries to authenticate
+    gate.on 'authenticate', (key) =>
+      if key == @key
+        console.log "Gate #{socket.remoteAddress}:#{socket.remotePort} connected"
+        gate.authenticated()
+        @gates.push gate
+        gate.socket.on 'close', =>
+          console.log "Gate #{socket.remoteAddress}:#{socket.remotePort} disconnected"
+          i = 0
+          while i < @gates.length
+            if @gates[i] == gate
+              @gates.splice(i, 1)
+              return
+            i += 1
+      else gate.notAuthenticated()
+
+    # Called when gate is ready to connect two peers
+    gate.on 'waiting', (key) =>
+      [peerId, otherId] = @gateConnections[key]
+      peer = @peers[peerId]
+      other = @peers[otherId]
+      delete @gateConnections[key]
+      if !peer && other
+        other.peerMissing peerId
+      else if peer && !other
+        peer.peerMissing otherId
+      else if peer && other
+        peer.peerGate other, gate.socket.remoteAddress, gate.port, key
+        other.peerGate peer, gate.socket.remoteAddress, gate.port, key
+
+  # Fired when a new peer is connected
+  peerConnection: (socket) ->
+    peer = new MasterToPeerConnection socket
+
+    peer.on 'id', (id) =>
+      if @peers[id]
+        peer.notAuthenticated()
+      else id.find (exists) =>
+        if exists
+          peer.setId(id)
+          peer.authenticated()
+        else
           peer.notAuthenticated()
-        else id.find (exists) =>
-          if exists
-            peer.setId(id)
-            peer.authenticated()
-          else
-            peer.notAuthenticated()
 
-      peer.on 'setId', (id) =>
-        @peers[id] = peer
-        console.log "Peer #{id} identified"
-        peer.on 'close', =>
-          delete @peers[id]
-          console.log "Peer #{id} quit"
+    peer.on 'setId', (id) =>
+      @peers[id] = peer
+      console.log "Peer #{id} identified"
+      peer.on 'close', =>
+        delete @peers[id]
+        console.log "Peer #{id} quit"
 
-      peer.on 'waiting', (id, key) =>
-        if other = @peers[id]
-          other.peerOut peer, key
+    peer.on 'waiting', (id, key) =>
+      if other = @peers[id]
+        other.peerOut peer, key
+      else
+        peer.peerMissing id
+
+    peer.on 'connect', (id) =>
+      if (other = @peers[id])?.isState('acceptingConnections')
+        # TCP connection is established if at least one of peers supports it
+        if other.supports 'incomingTCP'
+          other.peerIn peer
+        else if peer.supports 'incomingTCP'
+          peer.peerIn other
+        # If both peers don't support incoming TCP, fallback to gate
         else
-          peer.peerMissing id
-
-      peer.on 'connect', (id) =>
-        if (other = @peers[id])?.isState('acceptingConnections')
-          # TCP connection is established if at least one of peers supports it
-          if other.supports 'incomingTCP'
-            other.peerIn peer
-          else if peer.supports 'incomingTCP'
-            peer.peerIn other
-          # If both peers don't support TCP, fallback to UDP hole punching
-          else
-            throw new Error 'Not implemented' # TODO
-        else
-          peer.peerMissing id
-
-    mysql.createConnection mysqlOptions, (error) ->
-      return callback(error) if error
-      server = net.createServer(peerHandler)
-
-      # Error handling - currently id in use only
-      server.on 'error', (error) ->
-        if error.code == 'EADDRINUSE'
-          callback(error)
-        else throw error
-
-      # Begin listening
-      server.listen port, ->
-        console.log "Master running at localhost:#{port}"
-        callback()
+          # TODO: check length, select least loaded gate
+          key = Key.generate()
+          @gateConnections[key] = [peer.id, other.id]
+          @gates[0].connect key, peer.id, other.id
+      else
+        peer.peerMissing id

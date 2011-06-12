@@ -75,7 +75,7 @@ module.exports = class PeerToMasterConnection extends CommandConnection
     'acceptingConnections',
     (id, protocol, ip) ->
       key = Key.generate()
-      @emit 'acceptFrom', id, protocol, ip, key
+      @emit 'acceptFrom', new Id(id), protocol, ip, key
       @send "WAITING #{id} #{key}"
 
   # Received when a remote host with specified `id' wants to connect
@@ -85,7 +85,15 @@ module.exports = class PeerToMasterConnection extends CommandConnection
     'acceptingConnections',
     (id, protocol, ip, port, key) ->
       port = parseInt(port) # TODO: check range
-      @emit 'connectTo', id, protocol, ip, port, key
+      @emit 'connectTo', new Id(id), protocol, ip, port, key
+
+  # Received when a connection with remote host `id` should be established
+  # using gate.
+  @command /^PEER ((?:[0-9a-f]{2}\:){3}[0-9a-f]{2}) GATE ((?:[0-9]{1,3}\.){3}[0-9]{1,3}) ([0-9]{1,5}) ([0-9]{16})$/,
+    'acceptingConnections',
+    (id, ip, port, key) ->
+      port = parseInt(port) # TODO: check range
+      @emit 'connectTo', new Id(id), 'gate', ip, port, key
 
   # Received as a responce to a CONNECT or WAITING message when remote host
   # with specified id is not found.
